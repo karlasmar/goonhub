@@ -1,0 +1,22 @@
+{
+  "name": "mario-wan2-video-generation",
+  "description": "WAN 2.2 Video Generation - Text-to-Video & Image-to-Video with 14B Models",
+  "imageName": "mariogx/wan2-video-generation:latest",
+  "dockerStartCmd": "python wan2_handler.py",
+  "containerDiskInGb": 50,
+  "volumeInGb": 100,
+  "volumeMountPath": "/workspace",
+  "ports": "8188/http",
+  "env": [
+    {
+      "key": "PYTORCH_CUDA_ALLOC_CONF",
+      "value": "expandable_segments:True"
+    },
+    {
+      "key": "COMFYUI_MODEL_MEMORY_LIMIT",
+      "value": "20000"
+    }
+  ],
+  "isPublic": false,
+  "readme": "# WAN 2.2 Video Generation\n\n## Models\n- Text-to-Video: NSFW-API/NSFW_Wan_14b\n- Image-to-Video: Wan-AI/Wan2.2-I2V-A14B\n\n## Usage\nSend POST request to endpoint with:\n- `prompt`: Text description\n- `image_url`: (Optional) For image-to-video mode\n- `resolution`: '480p', '720p', or '1080p'\n- `num_frames`: 81-100 frames\n- `guidance_scale`: 3-5 recommended for WAN 2.2\n\n## Hardware Required\n- A100 80GB GPU minimum\n- 100GB storage for models"
+}

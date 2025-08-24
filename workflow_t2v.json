@@ -1,0 +1,89 @@
+{
+  "1": {
+    "class_type": "Wan2CheckpointLoader",
+    "inputs": {
+      "ckpt_name_high_noise": "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+      "ckpt_name_low_noise": "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "_meta": {
+      "title": "Wan2 Checkpoint Loader"
+    }
+  },
+  "2": {
+    "class_type": "Wan2TextEncode",
+    "inputs": {
+      "text": "PROMPT_PLACEHOLDER",
+      "text_encoder": ["1", 1]
+    },
+    "_meta": {
+      "title": "Positive Prompt"
+    }
+  },
+  "3": {
+    "class_type": "Wan2TextEncode",
+    "inputs": {
+      "text": "NEGATIVE_PROMPT_PLACEHOLDER",
+      "text_encoder": ["1", 1]
+    },
+    "_meta": {
+      "title": "Negative Prompt"
+    }
+  },
+  "4": {
+    "class_type": "Wan2EmptyLatentVideo",
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "frames": 90,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "Empty Latent Video"
+    }
+  },
+  "5": {
+    "class_type": "Wan2Sampler",
+    "inputs": {
+      "model": ["1", 0],
+      "positive": ["2", 0],
+      "negative": ["3", 0],
+      "latent_image": ["4", 0],
+      "seed": -1,
+      "steps": 30,
+      "cfg": 4.0,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "sample_shift": 8,
+      "motion_strength": 7,
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "Wan2 Sampler"
+    }
+  },
+  "6": {
+    "class_type": "Wan2VAEDecode",
+    "inputs": {
+      "samples": ["5", 0],
+      "vae": ["1", 2]
+    },
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "7": {
+    "class_type": "Wan2SaveVideo",
+    "inputs": {
+      "images": ["6", 0],
+      "filename_prefix": "wan2_t2v_output",
+      "fps": 24,
+      "save_image": true,
+      "pingpong": false,
+      "save_output": true
+    },
+    "_meta": {
+      "title": "Save Video"
+    }
+  }
+}
