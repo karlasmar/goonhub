@@ -1,0 +1,85 @@
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+
+# Set working directory
+WORKDIR /workspace
+
+# Install Python dependencies first (better caching)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    runpod==1.6.2 \
+    requests==2.31.0 \
+    pillow==10.0.0 \
+    opencv-python-headless==4.8.1.78
+
+# Install system dependencies in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    wget \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Clone ComfyUI
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI
+
+# Install ComfyUI dependencies
+WORKDIR /workspace/ComfyUI
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install WanVideo custom node
+RUN mkdir -p custom_nodes && \
+    cd custom_nodes && \
+    git clone https://github.com/kijai/ComfyUI-WanVideo.git && \
+    cd ComfyUI-WanVideo && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Create model directories
+RUN mkdir -p /workspace/ComfyUI/models/diffusion_models && \
+    mkdir -p /workspace/ComfyUI/models/text_encoders && \
+    mkdir -p /workspace/ComfyUI/models/vae && \
+    mkdir -p /workspace/ComfyUI/models/loras && \
+    mkdir -p /workspace/ComfyUI/output
+
+# Pre-download models (this makes cold starts much faster)
+RUN echo "📥 Pre-downloading WAN 2.2 models..." && \
+    cd /workspace/ComfyUI/models/diffusion_models && \
+    wget -O wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors \
+    "https://huggingface.co/NSFW-API/NSFW_Wan_14b/resolve/main/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors" && \
+    wget -O wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors \
+    "https://huggingface.co/NSFW-API/NSFW_Wan_14b/resolve/main/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" && \
+    wget -O wan2.2_i2v_high_noise_14B_fp16.safetensors \
+    "https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B/resolve/main/wan2.2_i2v_high_noise_14B_fp16.safetensors" && \
+    wget -O wan2.2_i2v_low_noise_14B_fp16.safetensors \
+    "https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B/resolve/main/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+
+# Download VAE and text encoder
+RUN cd /workspace/ComfyUI/models/vae && \
+    wget -O wan_2.1_vae.safetensors \
+    "https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled/resolve/main/vae/wan_2.1_vae.safetensors" && \
+    cd /workspace/ComfyUI/models/text_encoders && \
+    wget -O umt5_xxl_fp8_e4m3fn_scaled.safetensors \
+    "https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled/resolve/main/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+
+# Copy handler and workflows
+COPY wan2_handler.py /workspace/wan2_handler.py
+COPY workflow_t2v.json /workspace/workflow_t2v.json
+COPY workflow_i2v.json /workspace/workflow_i2v.json
+
+# Set working directory back to workspace
+WORKDIR /workspace
+
+# Expose port
+EXPOSE 8188
+
+# Set environment variables
+ENV PYTHONPATH="/workspace/ComfyUI:$PYTHONPATH"
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+ENV COMFYUI_MODEL_MEMORY_LIMIT=20000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8188/system_stats || exit 1
+
+# Start the handler
+CMD ["python", "wan2_handler.py"]
